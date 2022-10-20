@@ -29,7 +29,9 @@ object kafkaproducer {
     val upLat = json.ul.lat
 
 //API call using the coordinates above to get the traffic incidents
+
     val i = 1
+    var j = 0
     while (i <= 20)  {
       try {
         val incidentsUrl = "https://www.mapquestapi.com/traffic/v2/incidents?key=GO6Xati6oXWr2xPJ3tzx0U941GmKdFvB&filters=congestion&boundingBox=" + lowLat + "," + lowLng + "," + upLat + "," + upLng //39.744431,-75.141426,39.958858,-75.55426"   //39.95,-105.25,39.52,-104.71"
@@ -38,33 +40,63 @@ object kafkaproducer {
         val incidentsEntity = incidentsHttpResponse.getEntity
         val incidentsStr = EntityUtils.toString(incidentsEntity, "UTF-8")
         val incidentsJson = parse(incidentsStr).incidents
-        val incidentsLong = incidentsJson(0).lng
-        val incidentsLat = incidentsJson(0).lat
-        val incidentsJsonStr = incidentsJson.toString()
+        val size = incidentsStr.length
+//        JSONObject jsonObject = new JSONObject(jsonString)
+//        JSONArray incidentArray = jsonObject.getJSONArray("incidentsStr")
+//
+//        for(int j = 0; j < incidentArray.length)
+          while (j <= size){
+            val incidentsLong = incidentsJson(j).lng
+            val incidentsLat = incidentsJson(j).lat
+            val incidentsJsonStr = incidentsJson.toString()
 
-        val weatherUrl = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/"+incidentsLat+"%2C%20"+incidentsLong+"/today?unitGroup=metric&include=current%2Cevents%2Calerts&key=NJ5ANF65ZUXHMSZBMQ9NVJZ3H&contentType=json"
-        val weatherHttpClient = HttpClientBuilder.create().build()
-        val weatherHttpResponse = weatherHttpClient.execute(new HttpGet(weatherUrl))
-        val weatherEntity = weatherHttpResponse.getEntity
-        val weatherStr = EntityUtils.toString(weatherEntity, "UTF-8")
-        val weatherJson = parse(weatherStr).currentConditions
-        val weatherJsonStr = weatherJson.toString()
+            val weatherUrl = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/" + incidentsLat + "%2C%20" + incidentsLong + "/today?unitGroup=metric&include=current%2Cevents%2Calerts&key=NJ5ANF65ZUXHMSZBMQ9NVJZ3H&contentType=json"
+            val weatherHttpClient = HttpClientBuilder.create().build()
+            val weatherHttpResponse = weatherHttpClient.execute(new HttpGet(weatherUrl))
+            val weatherEntity = weatherHttpResponse.getEntity
+            val weatherStr = EntityUtils.toString(weatherEntity, "UTF-8")
+            val weatherJson = parse(weatherStr).currentConditions
+            val weatherJson2 = parse(weatherStr)
+            val weatherJsonStr = weatherJson.toString()
+            val weatherJsonStr2 = weatherJson2.toString()
 
-        println("============================== INCIDENT DATA ====================================")
-        val incidentData = new ProducerRecord[String, String]("incident", "key", incidentsJsonStr)
-//        println(incidentsLat)
-//        println(incidentsLong)
-          println(incidentData)
-        producer.send(incidentData)
-        println("================================================================================")
-        println("============================== WEATHER DATA ====================================")
-        val weatherData = new ProducerRecord[String, String]("weather","key", weatherJsonStr)
-//        println(weatherJson.latitude)
-//        println(weatherJson.longitude)
-          println(weatherData)
-        println("================================================================================")
-        producer.send(weatherData)
-        sleep(10000)
+
+            val weatherLat = parse(weatherStr).latitude.toString()
+            val weatherLong = parse(weatherStr).longitude.toString()
+
+            println("============================== INCIDENT DATA ====================================")
+            val incidentData = new ProducerRecord[String, String]("incident", "key", incidentsJsonStr)
+                    println("ilt: ", incidentsLat)
+                    println("ilg", incidentsLong)
+            println(incidentData)
+            producer.send(incidentData)
+            println("================================================================================")
+            println("============================== WEATHER DATA ====================================")
+            val weatherData = new ProducerRecord[String, String]("weather", "key", weatherJsonStr)
+            val weatherData2 = new ProducerRecord[String, String]("weatherAll", "key", weatherJsonStr2)
+            val weatherLatData = new ProducerRecord[String, String]("weatherLat", "key", weatherLat)
+            val weatherLongData = new ProducerRecord[String, String]("weatherLng", "key", weatherLong)
+                    println("wlt: ", parse(weatherStr).latitude)
+                    println("wlg: ", parse(weatherStr).longitude)
+                      println(weatherData2)
+            println("================================================================================")
+            producer.send(weatherData)
+//            producer.send(weatherData2)
+            producer.send(weatherLatData)
+            producer.send(weatherLongData)
+            sleep(10000)
+          j = j + 1
+          }
+
+
+
+//        val weatherLatData = new ProducerRecord[String, String]("weatherLat", "key", weatherLat)
+//        val weatherLngData = new ProducerRecord[String, String]("weatherLng", "key", weatherLng)
+
+
+
+
+
         producer.flush()
       } catch {
         case e: Exception => e.printStackTrace()

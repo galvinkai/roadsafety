@@ -31,3 +31,4 @@ libraryDependencies += "org.apache.httpcomponents" % "httpclient" % "4.5.13"
 libraryDependencies += "com.datastax.spark" %% "spark-cassandra-connector" % "3.2.0"
 libraryDependencies += "me.vican.jorge" %% "dijon" % "0.6.0"
 
+

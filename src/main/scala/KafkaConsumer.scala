@@ -1,39 +1,10 @@
+import com.datastax.spark.connector.cql.Schema
 import org.apache.spark.sql._
+import org.apache.spark.sql.functions.{col, from_json, lit}
+import org.apache.spark.sql.types.{StringType, StructType}
 
-case class WeatherDF (
-                       cloudcover: String,
-                       conditions: String,
-                       datetime: String,
-                       datetimeEpoch: String,
-                       dew: String,
-                       feelslike: String,
-                       humidity: String,
-                       icon: String,
-                       moonphase: String,
-                       precip: String,
-                       precipprob: String,
-                       preciptype: String,
-                       pressure: String,
-                       snow: String,
-                       snowdepth: String,
-                       solarenergy: String,
-                       solarradiation: String,
-                       stations: String,
-                       sunrise: String,
-                       sunriseEpoch: String,
-                       sunset: String,
-                       sunsetEpoch: String,
-                       temp: String,
-                       uvindex: String,
-                       visibility: String,
-                       winddir: String,
-                       windgust: String,
-                       windspeed: String)
-
-//case class IncidentDF(delayedFromFreeFlow: String, delayedFromTypical: String, distance: String, endTime: String, eventCode: String, fullDesc: String, iconURL: String, id: String, impacting: Boolean, lat: String, lng: String, parameterizeDescription: String, severity: String, shortDesc: String, startTime: String, type': String)
 
 object KafkaConsumer {
-  //  case class model(id: Stringeger, eventcode: Stringeger, lat: Stringeger, lng: Stringeger, severity: Stringeger)
 
   def main(args: Array[String]): Unit = {
 
@@ -44,61 +15,129 @@ object KafkaConsumer {
       .config("spark.cassandra.connection.host", "127.0.0.1")
       .getOrCreate()
 
+    spark.sparkContext.setLogLevel("ERROR")
 
     import spark.implicits._
 
-    val df = spark
+    val weatherStream = spark
       .readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
-      //          .option("startingOffsets", """{"incident":{"0":23,"1":-2},"weather":{"0":-2}}""")
-      //          .option("endingOffsets", """{"incident":{"0":50,"1":-1},"weather":{"0":-1}}""")
-      .option("subscribe", "incident, weather")
+      .option("subscribe", "weather")
       .load()
 
+    val weatherStreamLat = spark
+      .readStream
+      .format("kafka")
+      .option("kafka.bootstrap.servers", "localhost:9092")
+      .option("subscribe", "weatherAll")
+      .load()
 
-    val rawDF = df.selectExpr("CAST(value AS STRING)")
-      .as[(String)]
+    val weatherStreamLong = spark
+      .readStream
+      .format("kafka")
+      .option("kafka.bootstrap.servers", "localhost:9092")
+      .option("subscribe", "weatherLong")
+      .load()
 
-    //    df.selectExpr("CAST(value AS STRING)", "headers").as[(String, String, Array[(String, Array[Byte])])]
+    val incidentStream = spark
+      .readStream
+      .format("kafka")
+      .option("kafka.bootstrap.servers", "localhost:9092")
+      .option("subscribe", "incidents")
+      .load()
 
-    //        val streamDF = rawDF.map(row => row.split(":"))
-    //          .map(row => WeatherDF(
-    //            row(0),
-    //            row(1),
-    //            row(2),
-    //            row(3),
-    //            row(4),
-    //            row(5),
-    //            row(6),
-    //            row(7),
-    //            row(8),
-    //            row(9),
-    //            row(10),
-    //            row(11),
-    //            row(12),
-    //            row(13),
-    //            row(14),
-    //            row(15),
-    //            row(16),
-    //            row(17),
-    //            row(18),
-    //            row(19),
-    //            row(20),
-    //            row(21),
-    //            row(22),
-    //            row(23),
-    //            row(24),
-    //            row(25),
-    //            row(26),
-    //            row(27)
-    //          ))
+    val weatherRawDF = weatherStream.selectExpr("CAST(value as STRING)")
+    val weatherRawLatDF = weatherStreamLat.selectExpr("CAST(value as STRING)")
+    val weatherRawLongDF = weatherStreamLong.selectExpr("CAST(value as STRING)")
+    val incidentRawDF = incidentStream.selectExpr("CAST(value as STRING)")
 
-    //        val String_df = streamDF.select("String")
+    val weatherSchema = new StructType()
+      .add("latitude", StringType)
+      .add("longitude", StringType)
+      .add("datetime", StringType)
+      .add("datetimeEpoch", StringType)
+      .add("temp", StringType)
+      .add("feelslike", StringType)
+      .add("humidity", StringType)
+      .add("dew", StringType)
+      .add("precip", StringType)
+      .add("precipprob", StringType)
+      .add("snow", StringType)
+      .add("snowdepth", StringType)
+      .add("preciptype", StringType)
+      .add("windgust", StringType)
+      .add("windspeed", StringType)
+      .add("winddir", StringType)
+      .add("pressure", StringType)
+      .add("visibility", StringType)
+      .add("cloudcover", StringType)
+      .add("solarradiation", StringType)
+      .add("solarenergy", StringType)
+      .add("uvindex", StringType)
+      .add("conditions", StringType)
+      .add("icon", StringType)
+      .add("stations", StringType)
+      .add("sunrise", StringType)
+      .add("sunriseEpoch", StringType)
+      .add("sunset", StringType)
+      .add("sunsetEpoch", StringType)
+      .add("moonphase", StringType)
+
+    val incidentSchema = new StructType()
+      .add("id", StringType)
+      .add("type", StringType)
+      .add("severity", StringType)
+      .add("eventCode", StringType)
+      .add("lat", StringType)
+      .add("lng", StringType)
+      .add("startTime", StringType)
+      .add("endTime", StringType)
+      .add("impacting", StringType)
+      .add("shortDesc", StringType)
+      .add("fullDesc", StringType)
+      .add("delayFromFreeFlow", StringType)
+      .add("delayFromTypical", StringType)
+      .add("distance", StringType)
+
+    val locationSchema = new StructType()
+      .add("value", StringType)
+
+    val weatherLatDF = weatherRawLatDF.select(from_json(col("value"), weatherSchema)
+      .as("data"))
+      .select("data.*")
+    val weatherLongDF = weatherRawLongDF.select(from_json(col("value"), weatherSchema)
+      .as("data"))
+      .select("data.*")
+//    println("=======================================================")
+//    println(weatherLatDF)
+//    println("=======================================================")
+
+    val weatherDF = weatherRawDF.select(from_json(col("value"), weatherSchema)
+      .as("data"))
+      .select("data.*")
+      .unionByName(weatherLatDF, true)
+//      .withColumn("latitude", lit(weatherLatDF))
+//      .withColumn("longitude", lit(weatherLongDF))
+
+    val incidentDF = incidentRawDF.select(from_json(col("value"), incidentSchema).as("data")).select("data.*")
 
 
-
-    val weatherStream = rawDF
+//    val incidentStreamDF = incidentDF
+//      .writeStream
+//      //      .trigger(Trigger.ProcessingTime("1 seconds"))
+//      //      .foreachBatch { (batchDF: DataFrame, batchID: Long) =>
+//      //        prStringln(s"Writing to Cassandra $batchID")
+//      //        batchDF.write
+//      //          .cassandraFormat("nb_pol", "galvin")
+//      //          .mode("append")
+//      //          .save()
+//      //      }
+//      .outputMode("append")
+//      .format("console")
+//      .start()
+//
+    val weatherStreamDF = weatherLatDF
       .writeStream
       //      .trigger(Trigger.ProcessingTime("1 seconds"))
       //      .foreachBatch { (batchDF: DataFrame, batchID: Long) =>
@@ -108,13 +147,16 @@ object KafkaConsumer {
       //          .mode("append")
       //          .save()
       //      }
-      .outputMode("update")
+      .outputMode("append")
       .format("console")
       .start()
 
-    //    val query = String_df.writeStream.outputMode("update").format("console").start()
 
-    weatherStream.awaitTermination()
+
+    //    val query = String_df.writeStream.outputMode("update").format("console").start()
+//    incidentStreamDF.awaitTermination()
+    weatherStreamDF.awaitTermination()
+
 
 
     //      df1.rdd.saveToCassandra("apache", "trafficcongestion",
