@@ -65,11 +65,6 @@ object kafkaproducer {
             weatherJson.longitude = parse(weatherStr).longitude.toString()
             val weatherJson2 = parse(weatherStr)
             val weatherJsonStr = weatherJson.toString()
-            val weatherJsonStr2 = weatherJson2.toString()
-
-
-            val weatherLat = parse(weatherStr).latitude.toString()
-            val weatherLong = parse(weatherStr).longitude.toString()
 
             println("============================== INCIDENT DATA ====================================")
             val incidentData = new ProducerRecord[String, String]("incident", null, incidentsJsonStr)
