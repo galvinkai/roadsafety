@@ -6,6 +6,8 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, Produce
 import org.apache.kafka.common.utils.Utils.sleep
 import dijon._
 
+import scala.util.parsing.json.JSON.jsonArray
+
 object kafkaproducer {
   def main(args: Array[String]): Unit = {
 
@@ -40,7 +42,6 @@ object kafkaproducer {
         val incidentsEntity = incidentsHttpResponse.getEntity
         val incidentsStr = EntityUtils.toString(incidentsEntity, "UTF-8")
         val incidentsJson = parse(incidentsStr).incidents
-//        val jsonArray.incident = `[]`
         val incident = 1
 //        jsonArray.incidents(0) = incident
         val size = incidentsStr.length
@@ -53,7 +54,7 @@ object kafkaproducer {
           while (j <= size){
             val incidentsLong = incidentsJson(j).lng
             val incidentsLat = incidentsJson(j).lat
-            val incidentsJsonStr = incidentsJson.toString()
+            val incidentsJsonStr = incidentsJson(j).toString()
 
             val weatherUrl = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/" + incidentsLat + "%2C%20" + incidentsLong + "/today?unitGroup=metric&include=current%2Cevents%2Calerts&key=NJ5ANF65ZUXHMSZBMQ9NVJZ3H&contentType=json"
             val weatherHttpClient = HttpClientBuilder.create().build()
@@ -69,17 +70,17 @@ object kafkaproducer {
             val incidentData = new ProducerRecord[String, String]("incident", null, incidentsJsonStr)
             println("ilt: ", incidentsLat)
             println("ilg", incidentsLong)
-//            println(jsonArray)
-//            producer.send(incidentData)
+            println(incidentData)
+            producer.send(incidentData)
             println("================================================================================")
             println("============================== WEATHER DATA ====================================")
             val weatherData = new ProducerRecord[String, String]("weather", null, weatherJsonStr)
 //            println("wlt: ", parse(weatherStr).latitude)
 //            println("wlg: ", parse(weatherStr).longitude)
-//            println(weatherData)
+            println(weatherData)
 
             println("================================================================================")
-//            producer.send(weatherData)
+            producer.send(weatherData)
             sleep(10000)
           j = j + 1
           }

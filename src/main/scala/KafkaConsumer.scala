@@ -1,11 +1,10 @@
-import com.datastax.spark.connector.cql.Schema
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions.{col, from_json, lit}
+import org.apache.spark.sql.cassandra.DataFrameWriterWrapper
+import org.apache.spark.sql.functions.{col, from_json}
+import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types.{StringType, StructType}
 
-
 object KafkaConsumer {
-
   def main(args: Array[String]): Unit = {
 
     val spark = SparkSession
@@ -17,8 +16,6 @@ object KafkaConsumer {
 
     spark.sparkContext.setLogLevel("ERROR")
 
-    import spark.implicits._
-
     val weatherStream = spark
       .readStream
       .format("kafka")
@@ -26,37 +23,19 @@ object KafkaConsumer {
       .option("subscribe", "weather")
       .load()
 
-    val weatherStreamLat = spark
-      .readStream
-      .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:9092")
-      .option("subscribe", "weatherAll")
-      .load()
-
-    val weatherStreamLong = spark
-      .readStream
-      .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:9092")
-      .option("subscribe", "weatherLong")
-      .load()
-
     val incidentStream = spark
       .readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
-      .option("subscribe", "incidents")
+      .option("subscribe", "incident")
       .load()
 
     val weatherRawDF = weatherStream.selectExpr("CAST(value as STRING)")
-    val weatherRawLatDF = weatherStreamLat.selectExpr("CAST(value as STRING)")
-    val weatherRawLongDF = weatherStreamLong.selectExpr("CAST(value as STRING)")
     val incidentRawDF = incidentStream.selectExpr("CAST(value as STRING)")
 
     val weatherSchema = new StructType()
-      .add("latitude", StringType)
-      .add("longitude", StringType)
       .add("datetime", StringType)
-      .add("datetimeEpoch", StringType)
+      .add("datetimeepoch", StringType)
       .add("temp", StringType)
       .add("feelslike", StringType)
       .add("humidity", StringType)
@@ -79,50 +58,37 @@ object KafkaConsumer {
       .add("icon", StringType)
       .add("stations", StringType)
       .add("sunrise", StringType)
-      .add("sunriseEpoch", StringType)
+      .add("sunriseepoch", StringType)
       .add("sunset", StringType)
-      .add("sunsetEpoch", StringType)
+      .add("sunsetepoch", StringType)
       .add("moonphase", StringType)
+      .add("latitude", StringType)
+      .add("longitude", StringType)
 
     val incidentSchema = new StructType()
       .add("id", StringType)
       .add("type", StringType)
       .add("severity", StringType)
-      .add("eventCode", StringType)
+      .add("eventcode", StringType)
       .add("lat", StringType)
       .add("lng", StringType)
-      .add("startTime", StringType)
-      .add("endTime", StringType)
+      .add("starttime", StringType)
+      .add("endtime", StringType)
       .add("impacting", StringType)
-      .add("shortDesc", StringType)
-      .add("fullDesc", StringType)
-      .add("delayFromFreeFlow", StringType)
-      .add("delayFromTypical", StringType)
+      .add("shortdesc", StringType)
+      .add("fulldesc", StringType)
+      .add("delayfromfreeflow", StringType)
+      .add("delayfromtypical", StringType)
       .add("distance", StringType)
 
-    val locationSchema = new StructType()
-      .add("value", StringType)
 
-    val weatherLatDF = weatherRawLatDF.select(from_json(col("value"), weatherSchema)
-      .as("data"))
-      .select("data.*")
-    val weatherLongDF = weatherRawLongDF.select(from_json(col("value"), weatherSchema)
-      .as("data"))
-      .select("data.*")
-//    println("=======================================================")
-//    println(weatherLatDF)
-//    println("=======================================================")
-
-    val weatherDF = weatherRawDF.select(from_json(col("value"), weatherSchema)
-      .as("data"))
-      .select("data.*")
-      .unionByName(weatherLatDF, true)
-//      .withColumn("latitude", lit(weatherLatDF))
-//      .withColumn("longitude", lit(weatherLongDF))
-
+    val weatherDF = weatherRawDF.select(from_json(col("value"), weatherSchema).as("data")).select("data.*")
     val incidentDF = incidentRawDF.select(from_json(col("value"), incidentSchema).as("data")).select("data.*")
 
-
+//    val joinDF = incidentDF.join(weatherDF, incidentDF("lat") === weatherDF("latitude") && incidentDF("lng") === weatherDF("longitude"))
+    val joinTemp = weatherDF
+      .join(incidentDF, incidentDF("lat") === weatherDF("latitude") && incidentDF("lng") === weatherDF("longitude"), "inner")
+//println(joinDF)
 //    val incidentStreamDF = incidentDF
 //      .writeStream
 //      //      .trigger(Trigger.ProcessingTime("1 seconds"))
@@ -137,40 +103,22 @@ object KafkaConsumer {
 //      .format("console")
 //      .start()
 //
-    val weatherStreamDF = weatherLatDF
+    val trafficWeatherStream = joinTemp
       .writeStream
-      //      .trigger(Trigger.ProcessingTime("1 seconds"))
-      //      .foreachBatch { (batchDF: DataFrame, batchID: Long) =>
-      //        prStringln(s"Writing to Cassandra $batchID")
-      //        batchDF.write
-      //          .cassandraFormat("nb_pol", "galvin")
-      //          .mode("append")
-      //          .save()
-      //      }
+            .trigger(Trigger.ProcessingTime("1 seconds"))
+            .foreachBatch { (batchDF: DataFrame, batchID: Long) =>
+              println(s"Writing to Cassandra $batchID")
+//              println(batchDF)
+              batchDF.write
+                .cassandraFormat("trafficweatherdata", "apache")
+                .mode("append")
+                .save()
+            }
       .outputMode("append")
-      .format("console")
+//      .format("console")
       .start()
 
-
-
-    //    val query = String_df.writeStream.outputMode("update").format("console").start()
-//    incidentStreamDF.awaitTermination()
-    weatherStreamDF.awaitTermination()
-
-
-
-    //      df1.rdd.saveToCassandra("apache", "trafficcongestion",
-    //      SomeColumns("id", "type", "severity", "eventcode", "lat",
-    //        "lng", "starttime", "endtime", "impacting", "shortdesc", "fulldesc",
-    //        "delayfromfreeflow", "delayfromtypical", "distance"))
-
-
-    //    incidentDF.join(weather, empDF("lat") === weatherDF("dept_id") && Leaddetails("Utm_Source") === Utm_Master("Utm_Source"), "inner")
-    //      .join(addDF, empDF("emp_id") === addDF("emp_id"), "inner")
-    //      .show(false)
-    //
-
-
+    trafficWeatherStream.awaitTermination()
   }
 
 }

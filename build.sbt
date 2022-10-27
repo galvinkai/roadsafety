@@ -30,5 +30,6 @@ libraryDependencies += "org.apache.httpcomponents" % "httpclient" % "4.5.13"
 //// https://mvnrepository.com/artifact/com.datastax.spark/spark-cassandra-connector
 libraryDependencies += "com.datastax.spark" %% "spark-cassandra-connector" % "3.2.0"
 libraryDependencies += "me.vican.jorge" %% "dijon" % "0.6.0"
+libraryDependencies += "joda-time" % "joda-time" % "2.12.0"
 
 
