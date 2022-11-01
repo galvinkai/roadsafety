@@ -56,7 +56,7 @@ object kafkaproducer {
         val incidentData = new ProducerRecord[String, String]("incident", null, incidentsJsonStr)
         println("ilt: ", incidentsLat)
         println("ilg", incidentsLong)
-        println(incidentsUrl)
+//        println(incidentsUrl)
         println(incidentData)
         producer.send(incidentData)
 
