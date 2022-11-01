@@ -14,6 +14,7 @@ object KafkaConsumer {
       .config("spark.cassandra.connection.host", "127.0.0.1")
       .getOrCreate()
 
+
     spark.sparkContext.setLogLevel("ERROR")
 
     val weatherStream = spark
