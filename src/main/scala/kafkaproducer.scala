@@ -16,7 +16,7 @@ object kafkaproducer {
     val producer = new KafkaProducer[String, String](props)
 
 //API call to get the coordinates of a location from and location to
-    val cordURL = "http://www.mapquestapi.com/directions/v2/route?key=J8V0QP0EhGE0nq57SW7Ern6PTCJcHj1e&from=WashingtonDC,USA&to=Newyork,USA"
+    val cordURL = "http://www.mapquestapi.com/directions/v2/route?key=462wlx2emg9VA0jpVNS7rn76fY14G2Hq&from=WashingtonDC,USA&to=Newyork,USA"
     val httpClient = HttpClientBuilder.create().build()
     val httpResponse = httpClient.execute(new HttpGet(cordURL))
     val entity = httpResponse.getEntity
@@ -27,13 +27,12 @@ object kafkaproducer {
     val upLng = json.ul.lng
     val upLat = json.ul.lat
 
-//API call using the coordinates above to get the traffic incidents
-
+    //API call using the coordinates above to get the traffic incidents
     val i = 1
     var j = 0
     while (i <= 20)  {
       try {
-        val incidentsUrl = "https://www.mapquestapi.com/traffic/v2/incidents?key=J8V0QP0EhGE0nq57SW7Ern6PTCJcHj1e&filters=congestion&boundingBox=" + lowLat + "," + lowLng + "," + upLat + "," + upLng //39.744431,-75.141426,39.958858,-75.55426"   //39.95,-105.25,39.52,-104.71"
+        val incidentsUrl = "https://www.mapquestapi.com/traffic/v2/incidents?key=462wlx2emg9VA0jpVNS7rn76fY14G2Hq&filters=congestion&boundingBox=" + lowLat + "," + lowLng + "," + upLat + "," + upLng //39.744431,-75.141426,39.958858,-75.55426"   //39.95,-105.25,39.52,-104.71"
         val incidentsHttpClient = HttpClientBuilder.create().build()
         val incidentsHttpResponse = incidentsHttpClient.execute(new HttpGet(incidentsUrl))
         val incidentsEntity = incidentsHttpResponse.getEntity
@@ -57,6 +56,7 @@ object kafkaproducer {
         val incidentData = new ProducerRecord[String, String]("incident", null, incidentsJsonStr)
         println("ilt: ", incidentsLat)
         println("ilg", incidentsLong)
+        println(incidentsUrl)
         println(incidentData)
         producer.send(incidentData)
 
